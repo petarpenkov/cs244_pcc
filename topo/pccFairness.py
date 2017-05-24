@@ -79,10 +79,10 @@ def start_tcp_flows(net):
 
 def start_server(net):
     server = net.get('server')
-    cmd = "/home/mininet/pcc/receiver/app/appserver > /tmp/srv.out 2> /tmp/srv.err"
+    cmd = "./pcc/receiver/app/appserver > ./tmp/srv.out 2> ./tmp/srv.err"
     print "about to start cmd: %s" % cmd
     my_env = os.environ.copy()
-    my_env["LD_LIBRARY_PATH"] = "/home/mininet/pcc/receiver/src/"
+    my_env["LD_LIBRARY_PATH"] = "./pcc/receiver/src/"
     proc = server.popen(cmd, shell=True, env=my_env)
     print "started %s" % cmd
     sleep(1)
@@ -91,10 +91,10 @@ def start_server(net):
 def start_short_flow(net):
     server = net.get('server')
     shortRTT = net.get('shortRTT')
-    cmd = "/home/mininet/pcc/sender/app/appclient %s 9000 > /tmp/short.out 2> /tmp/short.err" % server.IP()
+    cmd = "./pcc/sender/app/appclient %s 9000 > ./tmp/short.out 2> ./tmp/short.err" % server.IP()
     print "about to start cmd: %s" % cmd
     my_env = os.environ.copy()
-    my_env["LD_LIBRARY_PATH"] = "/home/mininet/pcc/sender/src/"
+    my_env["LD_LIBRARY_PATH"] = "./pcc/sender/src/"
     proc = shortRTT.popen(cmd, shell=True, env=my_env)
     print "started %s" % cmd
     sleep(1)
@@ -103,10 +103,10 @@ def start_short_flow(net):
 def start_long_flow(net):
     server = net.get('server')
     longRTT = net.get('longRTT')
-    cmd = "/home/mininet/pcc/sender/app/appclient %s 9000 > /tmp/long.out 2> /tmp/long.err" % server.IP()
+    cmd = "./pcc/sender/app/appclient %s 9000 > ./tmp/long.out 2> ./tmp/long.err" % server.IP()
     print "about to start cmd: %s" % cmd
     my_env = os.environ.copy()
-    my_env["LD_LIBRARY_PATH"] = "/home/mininet/pcc/sender/src/"
+    my_env["LD_LIBRARY_PATH"] = "./pcc/sender/src/"
     proc = longRTT.popen(cmd, shell=True, env=my_env)
     print "started %s" % cmd
     sleep(1) # TODO?
