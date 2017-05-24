@@ -21,6 +21,7 @@ rm /tmp/long.* &> /dev/null
 sudo mn -c
 
 pushd ~/cs244_pcc/
+mkdir -p tmp
 python topo/pccFairness.py --bw-net $bwnet --bw-sender $bwsender \
                            --short-delay $shortdelay --long-delay $longdelay \
                            --server-delay $serverdelay
