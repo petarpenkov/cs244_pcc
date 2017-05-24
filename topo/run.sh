@@ -21,4 +21,5 @@ rm /tmp/long.* &> /dev/null
 sudo mn -c
 python pccFairness.py --bw-net $bwnet --bw-sender $bwsender \
                       --short-delay $shortdelay --long-delay $longdelay \
-                      --server-delay $serverdelay
+                      --server-delay $serverdelay --grab $grabduration \
+                      --time $runduration

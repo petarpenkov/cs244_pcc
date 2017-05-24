@@ -42,6 +42,16 @@ parser.add_argument('--cong',
                     help="Congestion control algorithm to use. pcc/cubic/reno",
                     default="pcc")
 
+parser.add_argument('--grab',
+                    type=int,
+                    help="How long to allow the long RTT flow to run alone(s)",
+                    default=5)
+
+parser.add_argument('--time',
+                    type=int,
+                    help="How long to run the two flows together(s)",
+                    default=500)
+
 args = parser.parse_args()
 
 class PCCTopo(Topo):
@@ -73,9 +83,12 @@ def start_tcp_flows(net):
     # Start the iperf client on the long RTT flow.
     # Creates a long lived TCP flow.
     longRTT.popen("iperf -c %s" % server.IP())
+
+    # Let the flow grab the bandwidth
+    sleep(args.grab)
     # Start the iperf client on the short RTT flow.
     # Creates a long lived TCP flow.
-    serverRTT.popen("iperf -c %s" % server.IP())
+    shortRTT.popen("iperf -c %s" % server.IP())
 
 def start_server(net):
     server = net.get('server')
@@ -117,22 +130,26 @@ def pcc_fairness():
     #if not os.path.exists(args.dir):
     #    os.makedirs(args.dir)
     
-    if args.cong != "pcc":
-        os.system("sysctl -w net.ipv4.tcp_congestion_control=%s" % args.cong)
-
     topo = PCCTopo()
     topo.build()
     net = Mininet(topo=topo, host=CPULimitedHost, link=TCLink)
     net.start()
     dumpNodeConnections(net.hosts)
 
-    start_server(net)
-    start_long_flow(net)
-    sleep(5)
-    # allow the long flow to grab the bandwidth
-    start_short_flow(net)
-    # run with both flows for 500 seconds 
-    sleep(500) 
+    if args.cong != "pcc":
+        # Run TCP experiment
+        os.system("sysctl -w net.ipv4.tcp_congestion_control=%s" % args.cong)
+        start_tcp_flows(net)
+    else:
+        # Run PCC experiment
+        start_server(net)
+        start_long_flow(net)
+        sleep(args.grab)
+        # allow the long flow to grab the bandwidth
+        start_short_flow(net)
+
+    # run with both flows
+    sleep(args.time)
 
     net.stop()
     #os.system("killall appclient")
