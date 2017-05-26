@@ -17,6 +17,7 @@ killall appserver &> /dev/null
 mn -c
 pushd ~/cs244_pcc/
 mkdir -p tmp
+
 rm ./tmp/srv* &> /dev/null
 rm ./tmp/short* &> /dev/null
 rm ./tmp/long* &> /dev/null
