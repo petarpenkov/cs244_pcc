@@ -14,19 +14,19 @@ runduration=50 # In seconds. Specifies how long the flows compete.
 
 killall appclient &> /dev/null
 killall appserver &> /dev/null
-rm /tmp/srv.* &> /dev/null
-rm /tmp/short.* &> /dev/null
-rm /tmp/long.* &> /dev/null
 
-sudo mn -c
+mn -c
 pushd ~/cs244_pcc/
 mkdir -p tmp
+rm ./tmp/srv.* &> /dev/null
+rm ./tmp/short.* &> /dev/null
+rm ./tmp/long.* &> /dev/null
 for longdelay in 10 20 30 40 50; do
     python topo/pccFairness.py --bw-net $bwnet --bw-sender $bwsender \
                                --short-delay $shortdelay --long-delay $longdelay \
                                --server-delay $serverdelay --grab $grabduration \
                                --time $runduration --cong cubic 
 
-    sudo mn -c
+    mn -c
 done;
 
