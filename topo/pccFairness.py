@@ -62,7 +62,11 @@ class PCCTopo(Topo):
         server   = self.addHost('server')
 
         # Buffer set to short RTT flow BDP 
-        qsize = args.bw_sender * args.short_delay
+        # Since BW is in Mb/s and RTT in ms, need to multiply by 1000
+        # to normalize
+        mtu = 1500;
+        qsize = args.bw_sender * args.short_delay * 1000 / mtu
+        print "Setting queue size to %d packets" % qsize
         # Should be divided by packet size as it is in packets TODO
         self.addLink(shortRTT, switch, bw=args.bw_sender, delay='%dms'\
                      % args.short_delay)
@@ -73,22 +77,42 @@ class PCCTopo(Topo):
                      
         return
 
+def redirect_output(flow, algorithm, delay):
+    name = "./tmp/%s_%s_%d" % (flow, algorithm, delay*2)
+    return " > %s.out 2> %s.err" % (name, name) 
+
 def start_tcp_flows(net):
     server = net.get('server')
     shortRTT = net.get('shortRTT')
     longRTT = net.get('longRTT')
     print "Starting iperf server..."
     # Start the iperf server ensuring it is not receiver-window limited
-    server.popen("iperf -s -w 16m")
+    # cmd = "iperf -i 1 -s -w 16m > ./tmp/srv.out 2> ./tmp/srv.err"
+    cmd = "iperf -i 1 -s -w 16m"
+    cmd += redirect_output("srv", args.cong, args.long_delay)
+    print "about to start cmd: %s" % cmd
+    server.popen(cmd, shell=True)
+    sleep(1)
+
     # Start the iperf client on the long RTT flow.
     # Creates a long lived TCP flow.
-    longRTT.popen("iperf -c %s" % server.IP())
+    cmd = "iperf -i 1 -t %d -c %s" % (args.time + args.grab, server.IP())
+    cmd += redirect_output("long", args.cong, args.long_delay)
+    # cmd = "iperf -i 1 -t %d -c %s > ./tmp/long.out 2> ./tmp/long.err" %\
+    #       (args.time + args.grab, server.IP())
+    print "about to start cmd: %s" % cmd
+    proc = longRTT.popen(cmd, shell=True)
 
     # Let the flow grab the bandwidth
     sleep(args.grab)
     # Start the iperf client on the short RTT flow.
     # Creates a long lived TCP flow.
-    shortRTT.popen("iperf -c %s" % server.IP())
+    #cmd = "iperf -i 1 -t %d -c %s > ./tmp/short.out 2> ./tmp/short.err" %\
+    #       (args.time, server.IP())
+    cmd = "iperf -i 1 -t %d -c %s" % (args.time, server.IP())
+    cmd += redirect_output("short", args.cong, args.long_delay)
+    print "about to start cmd: %s" % cmd
+    shortRTT.popen(cmd, shell=True)
 
 def start_server(net):
     server = net.get('server')
