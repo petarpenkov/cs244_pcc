@@ -27,6 +27,22 @@ def read_tcp_bandwidths(filename):
 
     return bws
 
+def read_pcc_bandwidths(filename):
+    bws = list()
+    try:
+        with open(filename, 'rb') as f:
+            # skip the header
+            f.readline()
+
+            reader = csv.reader(f, delimiter='\t', quoting=csv.QUOTE_NONE)
+            for row in reader:
+                # Bandwidths value is the first 
+                bws.append(float(row[0])) 
+    except: 
+        pass
+
+    return bws
+
 def plot_all():
     plt.axis([20 , 100, 0 , 1.2])
     formats = dict([
@@ -37,22 +53,26 @@ def plot_all():
     for alg in formats.keys():
         points = list()
         for rtt in range(20, 120, 20):
-            shortfile = "../tmp/short_%s_%d.out" % (alg, rtt)
-            longfile = "../tmp/long_%s_%d.out" % (alg, rtt)
+            shortfile = "tmp/short_%s_%d.out" % (alg, rtt)
+            longfile = "tmp/long_%s_%d.out" % (alg, rtt)
+            # init empty
+            bwshort = list()
+            bwlong = list()
             if alg != "pcc":
                 bwshort = read_tcp_bandwidths(shortfile)
                 bwlong = read_tcp_bandwidths(longfile)
-                shortlen = len(bwshort)
-                longlen = len(bwlong)
-                if shortlen * longlen == 0:
-                    # No data for the current data point
-                    continue
-                avgshort = sum(bwshort) / shortlen
-                avglong = sum(bwlong) / longlen
-                points.append([avgshort / avglong, rtt])
             else:
-                print "PCC plotting not implemented"
+                bwshort = read_pcc_bandwidths(shortfile)
+                bwlong = read_pcc_bandwidths(longfile)
+            shortlen = len(bwshort)
+            longlen = len(bwlong)
+            if shortlen * longlen == 0:
+                # No data for the current data point
                 continue
+            avgshort = sum(bwshort) / shortlen
+            avglong = sum(bwlong) / longlen
+            points.append([avgshort / avglong, rtt])
+
         relbws = [x[0] for x in points]
         delays = [x[1] for x in points]
         line, = plt.plot(delays, relbws, formats[alg], mfc="none")
@@ -61,6 +81,7 @@ def plot_all():
     plt.ylabel('Relative throughput of long-RTT flow')
     plt.xlabel('RTT of Long-RTT flow(ms)')
     plt.legend(loc="lower left")
-    plt.savefig('fairness.png')
+    plt.savefig('plots/fairness.png')
 plot_all()
+
 
