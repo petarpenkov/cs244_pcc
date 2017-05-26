@@ -63,9 +63,10 @@ class PCCTopo(Topo):
 
         # Buffer set to short RTT flow BDP 
         # Since BW is in Mb/s and RTT in ms, need to multiply by 1000
-        # to normalize
+        # to normalize. Delay is multiplied by 2 because BDP is computed
+        # with RT. Divided by 8 to convert from bits to bytes.
         mtu = 1500;
-        qsize = args.bw_sender * args.short_delay * 1000 / mtu
+        qsize = args.bw_sender * args.short_delay * 2 * 1000 / (8 * mtu)
         print "Setting queue size to %d packets" % qsize
         # Should be divided by packet size as it is in packets TODO
         self.addLink(shortRTT, switch, bw=args.bw_sender, delay='%dms'\
@@ -78,6 +79,7 @@ class PCCTopo(Topo):
         return
 
 def redirect_output(flow, algorithm, delay):
+    # Delay multiplied by 2 so filename contains RTT
     name = "./tmp/%s_%s_%d" % (flow, algorithm, delay*2)
     return " > %s.out 2> %s.err" % (name, name) 
 
@@ -116,7 +118,8 @@ def start_tcp_flows(net):
 
 def start_server(net):
     server = net.get('server')
-    cmd = "./pcc/receiver/app/appserver > ./tmp/srv.out 2> ./tmp/srv.err"
+    cmd = "./pcc/receiver/app/appserver"
+    cmd += redirect_output("srv", args.cong, args.long_delay)
     print "about to start cmd: %s" % cmd
     my_env = os.environ.copy()
     my_env["LD_LIBRARY_PATH"] = "./pcc/receiver/src/"
@@ -128,7 +131,8 @@ def start_server(net):
 def start_short_flow(net):
     server = net.get('server')
     shortRTT = net.get('shortRTT')
-    cmd = "./pcc/sender/app/appclient %s 9000 > ./tmp/short.out 2> ./tmp/short.err" % server.IP()
+    cmd = "./pcc/sender/app/appclient %s 9000" % server.IP()
+    cmd += redirect_output("short", args.cong, args.long_delay)
     print "about to start cmd: %s" % cmd
     my_env = os.environ.copy()
     my_env["LD_LIBRARY_PATH"] = "./pcc/sender/src/"
@@ -140,7 +144,8 @@ def start_short_flow(net):
 def start_long_flow(net):
     server = net.get('server')
     longRTT = net.get('longRTT')
-    cmd = "./pcc/sender/app/appclient %s 9000 > ./tmp/long.out 2> ./tmp/long.err" % server.IP()
+    cmd = "./pcc/sender/app/appclient %s 9000" % server.IP()
+    cmd += redirect_output("long", args.cong, args.long_delay)
     print "about to start cmd: %s" % cmd
     my_env = os.environ.copy()
     my_env["LD_LIBRARY_PATH"] = "./pcc/sender/src/"
@@ -155,7 +160,6 @@ def pcc_fairness():
     #    os.makedirs(args.dir)
     
     topo = PCCTopo()
-    topo.build()
     net = Mininet(topo=topo, host=CPULimitedHost, link=TCLink)
     net.start()
     dumpNodeConnections(net.hosts)
@@ -176,8 +180,8 @@ def pcc_fairness():
     sleep(args.time)
 
     net.stop()
-    #os.system("killall appclient")
-    #os.system("killall appserver")
+    os.system("killall appclient &> /dev/null")
+    os.system("killall appserver &> /dev/null")
     # TODO KILL EVERYTHING
     
     # From bufferbloat, might be worth doing TODO
