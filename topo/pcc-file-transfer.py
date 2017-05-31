@@ -9,6 +9,8 @@ from subprocess import Popen, PIPE
 from time import sleep
 
 import os
+import random
+import signal
 
 parser = ArgumentParser(description="PCC fairness")
 
@@ -23,14 +25,24 @@ parser.add_argument('--bw', '-b',
                     help="Bandwidth of link from sender to receiver (Mb/s)",
                     required=True)
 
+parser.add_argument('--flows',
+                    type=int,
+                    help="Bandwidth of link from sender to receiver (Mb/s)",
+                    required=True)
+
 parser.add_argument('--cong',
                     help="Congestion control algorithm to use. pcc/cubic/reno",
                     default="pcc")
 
+parser.add_argument('--lmbd-dist',
+                    type=float,
+                    help="Bandwidth of link from sender to receiver (Mb/s)",
+                    required=True)
+
 parser.add_argument('--time',
                     type=int,
                     help="How long to run the two flows together(s)",
-                    default=0)
+                    default=1)
 
 args = parser.parse_args()
 
@@ -47,33 +59,74 @@ class PCCTopo(Topo):
         qsize = args.bw * args.delay * 2 * 1000 / (8 * mtu)
         print "Setting queue size to %d packets" % qsize
         # Should be divided by packet size as it is in packets TODO
-        self.addLink(sender, receiver, bw=args.bw, delay='%dms'\
-                     % args.delay)
+        self.addLink(sender, receiver, bw=args.bw,\
+                     delay='%dms' % args.delay, max_queue_size=qsize, use_htb=True)
 
         return
 
-def start_receiver(net):
-    receiver = net.get('receiver')
-    cmd = "./pcc/receiver/app/recvfile > ./tmp/recvfile.out 2> ./tmp/recvfile.err"
-    print "about to start cmd: %s" % cmd
-    my_env = os.environ.copy()
-    my_env["LD_LIBRARY_PATH"] = "./pcc/receiver/src/"
-    proc = receiver.popen(cmd, shell=True, env=my_env)
-    print "started %s" % cmd
-    sleep(1)
-    return [proc]
+def link_monitor(net, interval_sec=0.1):
+    """Uses bwm-ng tool to collect iface tx rate stats.  Very reliable."""
 
-def start_sender(net):
+    cmd = ("bwm-ng -t %s -o csv "
+           "-u bytes -T rate -C ',' > %s" %
+           (interval_sec * 1000, "tmp/link_stats"))
+
+    receiver = net.get('receiver')
+
+    return receiver.popen(cmd, shell=True, preexec_fn=os.setsid)
+
+def start_receiver(net):
+    proc = None
+    receiver = net.get('receiver')
+
+    if args.cong == 'pcc':
+        cmd = "./pcc/receiver/app/recvfile > ./tmp/recvfile.out 2> ./tmp/recvfile.err"
+        my_env = os.environ.copy()
+        my_env["LD_LIBRARY_PATH"] = "./pcc/receiver/src/"
+        proc = receiver.popen(cmd, shell=True, env=my_env, preexec_fn=os.setsid)
+        print "started %s" % cmd
+    else:
+        print "Starting iperf server..."
+        # Start the iperf server ensuring it is not receiver-window limited
+        cmd = "iperf -N -i 1 -s -w 16m > ./tmp/recvfile.out 2> ./tmp/recvfile.err"
+        print "about to start cmd: %s" % cmd
+        proc = receiver.popen(cmd, shell=True, preexec_fn=os.setsid)
+
+    sleep(1)
+    return proc
+
+def start_sender(net, sender_id):
     receiver = net.get('receiver')
     sender = net.get('sender')
-    cmd = "./pcc/sender/app/sendfile %s 9000 data/100kb >> ./tmp/sendfile.out 2> ./tmp/sendfile.err" % receiver.IP()
-    print "about to start cmd: %s" % cmd
-    my_env = os.environ.copy()
-    my_env["LD_LIBRARY_PATH"] = "./pcc/sender/src/"
-    proc = sender.popen(cmd, shell=True, env=my_env)
-    print "started %s" % cmd
-    sleep(1)
-    return [proc]
+    proc = None
+    if args.cong == 'pcc':
+        cmd = "./pcc/sender/app/sendfile %s 9000 data/100kb > ./tmp/sendfile_%s.out 2> ./tmp/sendfile_%s.err" % (receiver.IP(), sender_id, sender_id)
+        my_env = os.environ.copy()
+        my_env["LD_LIBRARY_PATH"] = "./pcc/sender/src/"
+        proc = sender.popen(cmd, shell=True, env=my_env)
+        print "started %s" % cmd
+    else:
+        cmd = "iperf -N -i 1 -c %s -n 100K > ./tmp/sendfile_%s.out 2> ./tmp/sendfile_%s.err" % (receiver.IP(), sender_id, sender_id)
+        print "about to start cmd: %s" % cmd
+        proc = sender.popen(cmd, shell=True)
+    return proc
+
+def start_experiment(net):
+    # Run PCC experiment
+    monitor = link_monitor(net)
+    recv = start_receiver(net)
+    wait_group = []
+
+    for i in range(0, args.flows):
+        send_wait = start_sender(net, str(i))
+        wait_group.append(send_wait)
+        sleep(random.expovariate(args.lmbd_dist))
+
+    for w in wait_group:
+        w.wait()
+
+    os.killpg(os.getpgid(monitor.pid), signal.SIGKILL)
+    os.killpg(os.getpgid(recv.pid), signal.SIGKILL)
 
 def pcc_rtt():
     # Will likely be needed TODO
@@ -86,17 +139,10 @@ def pcc_rtt():
     net.start()
     dumpNodeConnections(net.hosts)
 
-    if args.cong != "pcc":
-        # Run TCP experiment
+    if args.cong != 'pcc':
         os.system("sysctl -w net.ipv4.tcp_congestion_control=%s" % args.cong)
-        start_tcp_flows(net)
-    else:
-        # Run PCC experiment
-        recv = start_receiver(net)
-        for i in range(0, 100):
-            send = start_sender(net)
-            send[0].wait()
-        recv[0].kill()
+
+    start_experiment(net)
 
     # run with both flows
     sleep(args.time)
