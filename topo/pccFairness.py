@@ -52,6 +52,10 @@ parser.add_argument('--time',
                     help="How long to run the two flows together(s)",
                     default=500)
 
+parser.add_argument('--dir',
+                    help="Subdirectory of tmp to store results in",
+                    required=True)
+
 args = parser.parse_args()
 
 class PCCTopo(Topo):
@@ -66,13 +70,13 @@ class PCCTopo(Topo):
         # to normalize. Delay is multiplied by 2 because BDP is computed
         # with RT. Divided by 8 to convert from bits to bytes.
         mtu = 1500;
-        qsize = args.bw_sender * args.short_delay * 2 * 1000 / (8 * mtu)
+        qsize = args.bw_net * args.short_delay * 2 * 1000 / (8 * mtu)
         print "Setting queue size to %d packets" % qsize
-        # Should be divided by packet size as it is in packets TODO
+
         self.addLink(shortRTT, switch, bw=args.bw_sender, delay='%dms'\
-                     % args.short_delay)
+                     % args.short_delay, use_htb=True)
         self.addLink(longRTT, switch, bw=args.bw_sender, delay='%dms'\
-                     % args.long_delay)
+                     % args.long_delay, use_htb=True)
         self.addLink(server, switch, bw=args.bw_net, delay='%dms'\
                      % args.server_delay, max_queue_size=qsize, use_htb=True)
                      
@@ -80,7 +84,7 @@ class PCCTopo(Topo):
 
 def redirect_output(flow, algorithm, delay):
     # Delay multiplied by 2 so filename contains RTT
-    name = "./tmp/%s_%s_%d" % (flow, algorithm, delay*2)
+    name = "./tmp/%s/%s_%s_%d" % (args.dir, flow, algorithm, delay*2)
     return " > %s.out 2> %s.err" % (name, name) 
 
 def start_tcp_flows(net):
@@ -89,8 +93,7 @@ def start_tcp_flows(net):
     longRTT = net.get('longRTT')
     print "Starting iperf server..."
     # Start the iperf server ensuring it is not receiver-window limited
-    # cmd = "iperf -i 1 -s -w 16m > ./tmp/srv.out 2> ./tmp/srv.err"
-    cmd = "iperf -i 1 -s -w 16m"
+    cmd = "iperf -N -i 1 -s -w 16m"
     cmd += redirect_output("srv", args.cong, args.long_delay)
     print "about to start cmd: %s" % cmd
     server.popen(cmd, shell=True)
@@ -98,10 +101,8 @@ def start_tcp_flows(net):
 
     # Start the iperf client on the long RTT flow.
     # Creates a long lived TCP flow.
-    cmd = "iperf -i 1 -t %d -c %s" % (args.time + args.grab, server.IP())
+    cmd = "iperf -N -i 1 -t %d -c %s" % (args.time + args.grab, server.IP())
     cmd += redirect_output("long", args.cong, args.long_delay)
-    # cmd = "iperf -i 1 -t %d -c %s > ./tmp/long.out 2> ./tmp/long.err" %\
-    #       (args.time + args.grab, server.IP())
     print "about to start cmd: %s" % cmd
     proc = longRTT.popen(cmd, shell=True)
 
@@ -109,9 +110,7 @@ def start_tcp_flows(net):
     sleep(args.grab)
     # Start the iperf client on the short RTT flow.
     # Creates a long lived TCP flow.
-    #cmd = "iperf -i 1 -t %d -c %s > ./tmp/short.out 2> ./tmp/short.err" %\
-    #       (args.time, server.IP())
-    cmd = "iperf -i 1 -t %d -c %s" % (args.time, server.IP())
+    cmd = "iperf -N -i 1 -t %d -c %s" % (args.time, server.IP())
     cmd += redirect_output("short", args.cong, args.long_delay)
     print "about to start cmd: %s" % cmd
     shortRTT.popen(cmd, shell=True)
@@ -151,13 +150,10 @@ def start_long_flow(net):
     my_env["LD_LIBRARY_PATH"] = "./pcc/sender/src/"
     proc = longRTT.popen(cmd, shell=True, env=my_env)
     print "started %s" % cmd
-    sleep(1) # TODO?
+    sleep(1)
     return [proc]
 
 def pcc_fairness():
-    # Will likely be needed TODO
-    #if not os.path.exists(args.dir):
-    #    os.makedirs(args.dir)
     
     topo = PCCTopo()
     net = Mininet(topo=topo, host=CPULimitedHost, link=TCLink)
@@ -182,12 +178,8 @@ def pcc_fairness():
     net.stop()
     os.system("killall appclient &> /dev/null")
     os.system("killall appserver &> /dev/null")
-    # TODO KILL EVERYTHING
     
-    # From bufferbloat, might be worth doing TODO
-    # Ensure that all processes you create within Mininet are killed.
-    # Sometimes they require manual killing.
-    # Popen("pgrep -f webserver.py | xargs kill -9", shell=True).wait()
+    os.system("killall iperf &> /dev/null")
 
 if __name__ == "__main__":
     pcc_fairness()
