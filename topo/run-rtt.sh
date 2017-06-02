@@ -11,7 +11,7 @@ flows=200      # Number of flows to run
 mn -c
 pushd ~/cs244_pcc/
 mkdir -p tmp
-for cong in pcc; do
+for cong in pcc cubic; do
     for lambda in `seq 1 14`; do
         dir="fct_${cong}_${lambda}"
         mkdir -p tmp/$dir
@@ -29,7 +29,7 @@ for cong in pcc; do
         if [ $cong == "pcc" ]; then
             cat tmp/${dir}/sendfile_*.out | grep duration | grep -o '[0-9]*' | sort -h > tmp/${dir}/durations
         else
-            tail -n 1 tmp/sendfile_*.out | grep -o '[0-9]*\.[0-9]* sec' | grep -o '[0-9]*\.[0-9]*' | awk '{ print 1000*$1 }' | sort -h > tmp/${dir}/durations
+            tail -n 1 tmp/${dir}/sendfile_*.out | grep -o '[0-9]*\.[0-9]* sec' | grep -o '[0-9]*\.[0-9]*' | awk '{ print 1000*$1 }' | sort -h > tmp/${dir}/durations
         fi
         grep eth0 tmp/${dir}/link_stats > tmp/${dir}/link_util.csv
     done;
