@@ -44,6 +44,10 @@ parser.add_argument('--time',
                     help="How long to run the two flows together(s)",
                     default=1)
 
+parser.add_argument('--dir',
+                    help="Subdirectory of tmp to store results in",
+                    required=True)
+
 args = parser.parse_args()
 
 class PCCTopo(Topo):
@@ -69,7 +73,7 @@ def link_monitor(net, interval_sec=0.1):
 
     cmd = ("bwm-ng -t %s -o csv "
            "-u bytes -T rate -C ',' > %s" %
-           (interval_sec * 1000, "tmp/link_stats"))
+           (interval_sec * 1000, "tmp/"+args.dir+"/link_stats"))
 
     receiver = net.get('receiver')
 
@@ -80,7 +84,7 @@ def start_receiver(net):
     receiver = net.get('receiver')
 
     if args.cong == 'pcc':
-        cmd = "./pcc/receiver/app/recvfile > ./tmp/recvfile.out 2> ./tmp/recvfile.err"
+        cmd = "./pcc/receiver/app/recvfile > ./tmp/%s/recvfile.out 2> ./tmp/%s/recvfile.err" % (args.dir, args.dir)
         my_env = os.environ.copy()
         my_env["LD_LIBRARY_PATH"] = "./pcc/receiver/src/"
         proc = receiver.popen(cmd, shell=True, env=my_env, preexec_fn=os.setsid)
@@ -88,7 +92,7 @@ def start_receiver(net):
     else:
         print "Starting iperf server..."
         # Start the iperf server ensuring it is not receiver-window limited
-        cmd = "iperf -N -i 1 -s -w 16m > ./tmp/recvfile.out 2> ./tmp/recvfile.err"
+        cmd = "iperf -s -w 16m > ./tmp/%s/recvfile.out 2> ./tmp/%s/recvfile.err" %(args.dir, args.dir)
         print "about to start cmd: %s" % cmd
         proc = receiver.popen(cmd, shell=True, preexec_fn=os.setsid)
 
@@ -100,13 +104,14 @@ def start_sender(net, sender_id):
     sender = net.get('sender')
     proc = None
     if args.cong == 'pcc':
-        cmd = "./pcc/sender/app/sendfile %s 9000 data/100kb > ./tmp/sendfile_%s.out 2> ./tmp/sendfile_%s.err" % (receiver.IP(), sender_id, sender_id)
+        cmd = "./pcc/sender/app/sendfile %s 9000 data/100kb > ./tmp/%s/sendfile_%s.out 2> ./tmp/%s/sendfile_%s.err" %\
+                (receiver.IP(), args.dir, sender_id, args.dir, sender_id)
         my_env = os.environ.copy()
         my_env["LD_LIBRARY_PATH"] = "./pcc/sender/src/"
         proc = sender.popen(cmd, shell=True, env=my_env)
         print "started %s" % cmd
     else:
-        cmd = "iperf -N -i 1 -c %s -n 100K > ./tmp/sendfile_%s.out 2> ./tmp/sendfile_%s.err" % (receiver.IP(), sender_id, sender_id)
+        cmd = "iperf -n 100K -c %s > ./tmp/%s/sendfile_%s.out 2> ./tmp/%s/sendfile_%s.err" % (receiver.IP(), args.dir, sender_id, args.dir, sender_id)
         print "about to start cmd: %s" % cmd
         proc = sender.popen(cmd, shell=True)
     return proc
@@ -134,7 +139,6 @@ def pcc_rtt():
     #    os.makedirs(args.dir)
     
     topo = PCCTopo()
-    topo.build()
     net = Mininet(topo=topo, host=CPULimitedHost, link=TCLink)
     net.start()
     dumpNodeConnections(net.hosts)
@@ -151,7 +155,6 @@ def pcc_rtt():
     #os.system("killall appclient")
     #os.system("killall appserver")
     # TODO KILL EVERYTHING
-    
     # From bufferbloat, might be worth doing TODO
     # Ensure that all processes you create within Mininet are killed.
     # Sometimes they require manual killing.

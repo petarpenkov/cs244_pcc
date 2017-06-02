@@ -31,7 +31,7 @@ else
     exit 2
 fi
 
-for iter in $(eval echo "{1..$niter}");do
+for iter in `seq 1 $niter`;do
     dir="run$iter"
     mkdir -p tmp/$dir
     for algorithm in "pcc" "reno" "cubic"; do
