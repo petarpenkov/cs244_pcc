@@ -1,1 +1,5 @@
 tmp/
+server
+client
+file_received
+plots/

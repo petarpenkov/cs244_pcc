@@ -1,4 +1,4 @@
-sudo apt-get --assume-yes install clang libudt-dev python-matplotlib bwm-ng git golang
+sudo apt-get --assume-yes install clang libudt-dev python-matplotlib bwm-ng git golang screen
 
 git clone --recursive https://github.com/petarpenkov/cs244_pcc
 

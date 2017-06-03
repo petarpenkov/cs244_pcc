@@ -93,6 +93,8 @@ def plot_all():
             if stats == None:
                 continue
             util = compute_average_util('tmp/fct_%s_%d/link_util.csv' % (alg, lmbd))
+            if util > 80:
+                continue
 
             means.append([util, stats['mean']])
             medians.append([util, stats['med']])
@@ -100,6 +102,10 @@ def plot_all():
 
         if len(means) == 0:
             continue
+
+        means.sort(key=lambda x: x[0])
+        medians.sort(key=lambda x: x[0])
+        perc95.sort(key=lambda x: x[0])
 
         utils = [x[0] for x in means]
         fcts  = [x[1] for x in means]
