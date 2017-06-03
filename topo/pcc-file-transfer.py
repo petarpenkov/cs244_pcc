@@ -92,7 +92,8 @@ def start_receiver(net):
     else:
         print "Starting iperf server..."
         # Start the iperf server ensuring it is not receiver-window limited
-        cmd = "iperf -s -w 16m > ./tmp/%s/recvfile.out 2> ./tmp/%s/recvfile.err" %(args.dir, args.dir)
+        #cmd = "iperf -s -w 16m > ./tmp/%s/recvfile.out 2> ./tmp/%s/recvfile.err" %(args.dir, args.dir)
+        cmd = "./server > ./tmp/%s/recvfile.out 2> ./tmp/%s/recvfile.err" %(args.dir, args.dir)
         print "about to start cmd: %s" % cmd
         proc = receiver.popen(cmd, shell=True, preexec_fn=os.setsid)
 
@@ -102,16 +103,22 @@ def start_receiver(net):
 def start_sender(net, sender_id):
     receiver = net.get('receiver')
     sender = net.get('sender')
+
     proc = None
     if args.cong == 'pcc':
-        cmd = "./pcc/sender/app/sendfile %s 9000 data/100kb > ./tmp/%s/sendfile_%s.out 2> ./tmp/%s/sendfile_%s.err" %\
-                (receiver.IP(), args.dir, sender_id, args.dir, sender_id)
+        cmd = "time -f '%%e' --output=./tmp/%s/sendfile_time_%s.out ./pcc/sender/app/sendfile %s 9000 data/100kb > ./tmp/%s/sendfile_%s.out 2> ./tmp/%s/sendfile_%s.err" %\
+                (args.dir, sender_id, receiver.IP(), args.dir, sender_id, args.dir, sender_id)
+        #cmd = "time -f '%%e' --output=./tmp/%s/sendfile_time_%s.out ./pcc/sender/app/sendfile %s 9000 data/100kb" %\
+        #        (args.dir, sender_id, receiver.IP())
         my_env = os.environ.copy()
         my_env["LD_LIBRARY_PATH"] = "./pcc/sender/src/"
         proc = sender.popen(cmd, shell=True, env=my_env)
         print "started %s" % cmd
     else:
-        cmd = "iperf -n 100K -c %s > ./tmp/%s/sendfile_%s.out 2> ./tmp/%s/sendfile_%s.err" % (receiver.IP(), args.dir, sender_id, args.dir, sender_id)
+        #cmd = "time -f '%%e' --output=./tmp/%s/sendfile_time_%s.out iperf -n 100K -c %s > ./tmp/%s/sendfile_%s.out 2> ./tmp/%s/sendfile_%s.err" %\
+        #    (args.dir, sender_id, receiver.IP(), args.dir, sender_id, args.dir, sender_id)
+        cmd = "time -f '%%e' --output=./tmp/%s/sendfile_time_%s.out ./client %s:9000 < data/100kb > ./tmp/%s/sendfile_%s.out 2> ./tmp/%s/sendfile_%s.err" %\
+                (args.dir, sender_id, receiver.IP(), args.dir, sender_id, args.dir, sender_id)
         print "about to start cmd: %s" % cmd
         proc = sender.popen(cmd, shell=True)
     return proc
@@ -121,6 +128,18 @@ def start_experiment(net):
     monitor = link_monitor(net)
     recv = start_receiver(net)
     wait_group = []
+
+    receiver = net.get('receiver')
+    sender = net.get('sender')
+
+    if args.cong != 'pcc':
+        ip_route = sender.cmd('ip route show')
+        sender.cmd('ip route change %s initcwnd %d initrwnd %d mtu 1500'
+            % (ip_route.strip(), 1, 1))
+
+        ip_route = receiver.cmd('ip route show')
+        receiver.cmd('ip route change %s initcwnd %d initrwnd %d mtu 1500'
+            % (ip_route.strip(), 1, 1))
 
     for i in range(0, args.flows):
         send_wait = start_sender(net, str(i))

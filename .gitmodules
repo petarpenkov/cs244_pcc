@@ -1,4 +1,4 @@
 [submodule "pcc"]
 	path = pcc
-	url = git@github.com:renegat96/pcc.git
+	url = https://github.com/renegat96/pcc.git
 	master = master
