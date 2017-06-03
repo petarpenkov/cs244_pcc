@@ -42,6 +42,8 @@ plots to your machine by executing
 The default password required for ssh login is ‘mininet’. We recommend
 that this is changed by the team that reproduces these results.
 
+Once the experiments are done, there will be a file named 'done' in the home folder of the VM instance. This is created by run-experiment.sh at the end.
+
 We can provide an IP address to a machine that is already set up with
 all dependencies and scripts. We have not provided that here for
 security considerations. Please contact us at Hristo Stoyanov
