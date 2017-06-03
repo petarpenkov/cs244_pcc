@@ -18,7 +18,7 @@ CPUs and the associated memory quantity.
 
 Further, once instance exists, please run the following three commands:
 
-    curl https://raw.githubusercontent.com/petarpenkov/cs244_pcc/master/run-remotely.sh | bash ;
+    wget https://raw.githubusercontent.com/petarpenkov/cs244_pcc/master/run-remotely.sh && chmod +x run-remotely.sh && ./run-remotely.sh ;
 
 The above will run several commands that require ssh and gcloud. 
 
