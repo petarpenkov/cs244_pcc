@@ -34,7 +34,7 @@ And once into the VM, execute
 To see the progress report, while it runs. See man screen on how to
 use it.
 
-One the results are done, after about 6 hours, you can copy the two
+The results will be ready in about 8 hours. Once the results are done, you can copy the
 plots to your machine by executing
 
     scp mininet@${VM_IP}:’/home/mininet/cs244_pcc/plots/*’ .
