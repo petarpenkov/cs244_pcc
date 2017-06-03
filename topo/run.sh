@@ -16,7 +16,6 @@ killall appserver &> /dev/null
 
 mn -c
 pushd ~/cs244_pcc/
-rm -r tmp
 mkdir -p tmp
 
 if [ "$#" -ge 2 ]; then
@@ -33,6 +32,7 @@ fi
 
 for iter in `seq 1 $niter`;do
     dir="run$iter"
+    rm -r tmp/$dir
     mkdir -p tmp/$dir
     for algorithm in "pcc" "reno" "cubic"; do
         for longdelay in  10 20 30 40 50; do
